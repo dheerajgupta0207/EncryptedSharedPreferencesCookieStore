@@ -1,0 +1,24 @@
+#!/bin/bash -e
+if [ "x$1" == "xlocal" ]
+then
+  echo "Local release..."
+  export LOCAL_MAVEN_URL="file://$(pwd)/releases"
+  mkdir -p releases
+  ./gradlew clean test publish -PmavPublishToInternalRepo=true
+  version=$(cat manifest.gradle | grep library_version | awk '{print $3}' | tr "'" "\n" | head -n 2 | tail -n 1)
+  echo "released local version $version"
+else
+  echo "Releasing on Maven Central ..."
+  ./gradlew clean test publish -PmavSigning=true -PmavPublishToRemoteRepo=true --max-workers 1
+
+  echo "Generating Demo Apk ..."
+  ./generate-debug-apk
+
+  echo "Creating GitHub Release ..."
+  version=$(cat manifest.gradle | grep "library_version" | tr "'" '\n' | head -n 2 | tail -n 1)
+  hub release create -a cookie-store-demo-debug.apk -m "$version" "$version"
+
+  echo
+  echo "Done!"
+  echo "Visit https://oss.sonatype.org/#stagingRepositories and confirm the release"
+fi
